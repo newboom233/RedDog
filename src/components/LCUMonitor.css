@@ -716,3 +716,10 @@
 .refresh-btn:active {
   transform: translateY(0);
 } 
+
+.info-item .value,
+.info-item .label,
+.summoner-info .value,
+.summoner-info .label {
+  color: #222 !important;
+} 
