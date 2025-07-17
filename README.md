@@ -23,6 +23,7 @@ npm install
 ## 🛠️ 开发
 
 ```bash
+# 需要管理员权限运行，不然无法获取进程启动参数
 # 启动开发模式 (同时启动 React 开发服务器和 Electron)
 npm run electron-dev
 

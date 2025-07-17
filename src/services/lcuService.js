@@ -25,43 +25,49 @@ class LCUService {
 
   // 改进的LCU进程检测方法
   async getLCUProcessInfo() {
-    // 临时写死端口和密码，直接返回
-    return {
-      port: '7518',
-      password: 'zHK2ZrYGSUN3i9wFj_HABw',
-      baseUrl: 'https://127.0.0.1:7518'
-    };
-  }
 
-  // 通过lockfile查找LCU（备用方法）
-  async findLCUByLockfile() {
     try {
-      if (!window.require) return null;
-      
-      const fs = window.require('fs');
-      const path = window.require('path');
-      const os = window.require('os');
-      
-      // 常见的lockfile位置
-      const lockfilePaths = [
-        path.join(os.homedir(), 'AppData', 'Roaming', 'League of Legends', 'lockfile'),
-        path.join(os.homedir(), 'AppData', 'Local', 'Riot Games', 'League of Legends', 'lockfile'),
-        path.join('C:', 'Riot Games', 'League of Legends', 'lockfile'),
-        // 新增WeGame实际路径
-        'd:/wegameapps/英雄联盟/LeagueClient/lockfile'
-      ];
+      if (!window.require) {
+        throw new Error('不在Electron环境中，无法访问Node.js模块');
+      }
 
-      for (const lockfilePath of lockfilePaths) {
+      const { exec } = window.require('child_process');
+      const util = window.require('util');
+      const execAsync = util.promisify(exec);
+
+      let commands = [];
+      
+      // 尝试多种命令来获取进程信息
+      if (process.platform === 'win32') {
+        commands = [
+          'wmic PROCESS WHERE name="LeagueClientUx.exe" GET commandline /format:list',
+          'tasklist /FI "IMAGENAME eq LeagueClientUx.exe" /FO CSV',
+          'Get-Process LeagueClientUx -ErrorAction SilentlyContinue | Select-Object Commandline'
+        ];
+      } else {
+        commands = [
+          'ps aux | grep LeagueClientUx',
+          'pgrep -f LeagueClientUx'
+        ];
+      }
+
+      for (const command of commands) {
         try {
-          if (fs.existsSync(lockfilePath)) {
-            const lockfileContent = fs.readFileSync(lockfilePath, 'utf8');
-            const [processName, port, password, address, username] = lockfileContent.split(':');
+          console.log(`🔍 尝试命令: ${command}`);
+          const { stdout } = await execAsync(command);
+          
+          if (stdout && stdout.trim()) {
+            // 解析命令行参数
+            const portMatch = stdout.match(/--app-port=([0-9]+)(?= *"| --)/);
+            const passwordMatch = stdout.match(/--remoting-auth-token=(.+?)(?= *"| --)/);
             
-            if (processName === 'LeagueClientUx' && port && password) {
-              console.log('✅ 通过lockfile找到LCU:', { 
+            if (portMatch && passwordMatch) {
+              const port = portMatch[1];
+              const password = passwordMatch[1];
+              
+              console.log('✅ 通过进程命令找到LCU:', { 
                 port, 
-                hasPassword: !!password,
-                lockfilePath
+                hasPassword: !!password
               });
               
               return {
@@ -71,19 +77,72 @@ class LCUService {
               };
             }
           }
-        } catch (fileError) {
-          console.log(`❌ 读取lockfile失败: ${lockfilePath}`, fileError.message);
+        } catch (cmdError) {
+          console.log(`❌ 命令失败: ${command}`, cmdError.message);
           continue;
         }
       }
+
+    //   // 如果所有命令都失败，尝试通过文件系统查找
+    //   console.log('🔍 进程命令失败，尝试通过lockfile查找...');
+    //   return await this.findLCUByLockfile();
       
-      console.log('❌ 未找到有效的lockfile');
-      return null;
     } catch (error) {
-      console.error('❌ 通过lockfile查找LCU失败:', error);
+      console.error('❌ 获取LCU进程信息失败:', error);
       return null;
     }
   }
+
+//   // 通过lockfile查找LCU（备用方法）
+//   async findLCUByLockfile() {
+//     try {
+//       if (!window.require) return null;
+      
+//       const fs = window.require('fs');
+//       const path = window.require('path');
+//       const os = window.require('os');
+      
+
+//       // 常见的lockfile位置
+//       const lockfilePaths = [
+//         path.join(os.homedir(), 'AppData', 'Roaming', 'League of Legends', 'lockfile'),
+//         path.join(os.homedir(), 'AppData', 'Local', 'Riot Games', 'League of Legends', 'lockfile'),
+//         path.join('C:', 'Riot Games', 'League of Legends', 'lockfile')
+//       ];
+
+//       for (const lockfilePath of lockfilePaths) {
+//         try {
+//           if (fs.existsSync(lockfilePath)) {
+//             const lockfileContent = fs.readFileSync(lockfilePath, 'utf8');
+//             const [processName, , port, password] = lockfileContent.split(':');
+            
+//             if (processName === 'LeagueClientUx' && port && password) {
+//               console.log('✅ 通过lockfile找到LCU:', { 
+//                 port, 
+//                 hasPassword: !!password,
+//                 lockfilePath
+//               });
+              
+//               return {
+//                 port,
+//                 password,
+//                 baseUrl: `https://127.0.0.1:${port}`
+//               };
+//             }
+//           }
+//         } catch (fileError) {
+//           console.log(`❌ 读取lockfile失败: ${lockfilePath}`, fileError.message);
+//           continue;
+//         }
+//       }
+      
+//       console.log('❌ 未找到有效的lockfile');
+//       return null;
+//     } catch (error) {
+//       console.error('❌ 通过lockfile查找LCU失败:', error);
+//       return null;
+//     }
+//   }
 
   // 改进的连接方法
   async connect() {
@@ -220,10 +279,10 @@ class LCUService {
         try {
           // 检查数据是否为空或无效
           if (!data || typeof data !== 'string' || data.trim() === '') {
-            console.log('⚠️ 收到空的WebSocket消息，跳过处理');
+            console.log('⚠️ 收到空的WebSocket消息，跳过处理->', data);
             return;
           }
-          
+          console.log('收到socket信息', data)
           const message = JSON.parse(data);
           this.handleWebSocketMessage(message);
         } catch (error) {
@@ -848,9 +907,9 @@ class LCUService {
       21: '屏障', // SummonerBarrier
       1: '净化', // SummonerBoost (Cleanse)
       14: '点燃', // SummonerDot (Ignite)
-      3: '闪现', // SummonerFlash
+      3: '治疗术', // SummonerFlash
       6: '幽灵疾步', // SummonerHaste (Ghost) - 修正
-      4: '治疗术', // SummonerHeal - 修正
+      4: '闪现', // SummonerHeal - 修正
       7: '清晰术', // SummonerMana
       11: '惩戒', // SummonerSmite
       12: '传送', // SummonerTeleport
