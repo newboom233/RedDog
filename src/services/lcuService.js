@@ -20,10 +20,12 @@ class LCUService {
     this.maxReconnectAttempts = 3;
     this.lastGamePhase = null; // 记录上次的游戏阶段
     this.connectionRetryCount = 0; // 连接重试次数
+    this.cachedEnemyInfo = null; // 新增缓存
   }
 
   // 改进的LCU进程检测方法
   async getLCUProcessInfo() {
+
     try {
       if (!window.require) {
         throw new Error('不在Electron环境中，无法访问Node.js模块');
@@ -100,6 +102,7 @@ class LCUService {
 //       const path = window.require('path');
 //       const os = window.require('os');
       
+
 //       // 常见的lockfile位置
 //       const lockfilePaths = [
 //         path.join(os.homedir(), 'AppData', 'Roaming', 'League of Legends', 'lockfile'),
@@ -1231,48 +1234,77 @@ class LCUService {
     }
   }
 
-  // 新增：处理当前游戏状态的方法
+  // 新增：只在Loading阶段抓取敌方信息
+  async cacheEnemyInfoIfLoading() {
+    const session = await this.getGameStatus(); // GET /lol-gameflow/v1/session
+    if (session && session.phase === 'Loading') {
+      // 只在Loading阶段保存一次
+      if (!this.cachedEnemyInfo) {
+        // 提取敌方和我方信息
+        const theirTeam = session.gameData?.teamOne || [];
+        const myTeam = session.gameData?.teamTwo || [];
+        this.cachedEnemyInfo = {
+          type: 'loading',
+          theirTeam,
+          myTeam,
+          rawData: session,
+          timestamp: Date.now()
+        };
+        console.log('✅ 已缓存载入界面敌方信息:', this.cachedEnemyInfo);
+      }
+    }
+  }
+
+  // 修改 processCurrentGameState 逻辑
   async processCurrentGameState() {
     try {
       const gameStatus = await this.getGameStatus();
       console.log('🎮 当前游戏状态:', gameStatus);
-      
       if (gameStatus) {
-        console.log(`🎯 当前游戏阶段: ${gameStatus.phase}`);
         this.lastGamePhase = gameStatus.phase;
-        
-        // 根据游戏阶段立即获取相应信息
+        // 只在Loading阶段缓存敌方信息
+        await this.cacheEnemyInfoIfLoading();
         switch (gameStatus.phase) {
           case 'ChampSelect':
-            console.log('🎯 检测到英雄选择阶段，立即获取英雄选择信息...');
             await this.getChampSelectInfo();
             break;
+          case 'Loading':
+            // 只用缓存，不再更新 enemyInfo
+            if (this.cachedEnemyInfo) {
+              this.enemyInfo = this.cachedEnemyInfo;
+              this.notifyListeners();
+            }
+            break;
           case 'InProgress':
-            console.log('⚔️ 检测到游戏进行中，立即获取游戏信息...');
-            await this.getEnemyInfo();
+            // 游戏中只展示缓存，不再更新
+            if (this.cachedEnemyInfo) {
+              this.enemyInfo = this.cachedEnemyInfo;
+              this.notifyListeners();
+            } else {
+              // 没有缓存则不显示
+              this.enemyInfo = null;
+              this.notifyListeners();
+            }
             break;
           case 'None':
-            console.log('🏠 在客户端大厅，清空游戏信息');
             this.enemyInfo = null;
+            this.cachedEnemyInfo = null;
             this.notifyListeners();
             break;
           default:
-            console.log(`📝 当前阶段: ${gameStatus.phase}，尝试获取英雄选择信息...`);
-            // 即使不是主要阶段，也尝试获取信息
             if (gameStatus.phase !== 'None') {
               await this.getChampSelectInfo();
             }
         }
       } else {
-        console.log('⚠️ 无法获取游戏状态');
-        // 即使无法获取游戏状态，也通知监听器当前状态
         this.enemyInfo = null;
+        this.cachedEnemyInfo = null;
         this.notifyListeners();
       }
     } catch (error) {
       console.error('❌ 处理当前游戏状态失败:', error);
-      // 错误时也通知监听器
       this.enemyInfo = null;
+      this.cachedEnemyInfo = null;
       this.notifyListeners();
     }
   }
@@ -1365,6 +1397,7 @@ class LCUService {
     this.gameData = null;
     this.enemyInfo = null;
     this.lastGamePhase = null;
+    this.cachedEnemyInfo = null; // 断开连接时也清空缓存
     
     console.log('🔌 LCU连接已断开');
   }
