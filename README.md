@@ -1,117 +1,182 @@
-# RedDog App
+# LCU Monitor - 英雄联盟对战信息监控
 
-一个基于 React 和 Electron 的现代化桌面应用程序。
+一个现代化的基于 tkinter 的英雄联盟客户端对战信息监控工具，具有清晰的架构和美观的界面。
 
-## 🚀 功能特性
+## 功能特性
 
-- ✅ React 18 支持
-- ✅ Electron 25 支持
-- ✅ 现代化 UI 设计
-- ✅ 跨平台支持 (Windows, macOS, Linux)
-- ✅ 热重载开发
-- ✅ 应用打包
-- ✅ 响应式设计
-- ✅ 英雄联盟LCU监控 (演示模式)
+### ✅ 已实现功能
 
-## 📦 安装
+1. **数据与显示解耦** - 采用 MVC 架构设计
+2. **定时获取客户端状态** - 每3秒自动更新游戏数据
+3. **现代化主界面** - 美观的卡片式布局，深色主题
+4. **英雄选择监控** - 显示对战双方的英雄、召唤师技能和符文
+5. **半透明悬浮窗** - 无边框设计，支持拖拽
+6. **快捷键支持** - Ctrl+Shift+O 呼出/隐藏悬浮窗
+7. **点击复制功能** - 点击召唤师技能复制对应信息
+8. **实时冷却计算** - 显示召唤师技能下次可用的准确时间
 
-```bash
-# 安装依赖
-npm install
-```
+### 🎨 界面设计
 
-## 🛠️ 开发
+- **主窗口**: 标签页式设计，支持英雄选择和设置
+- **悬浮窗**: 半透明无边框，可自由拖拽位置
+- **响应式布局**: 自适应窗口大小调整
+- **现代化配色**: 深色主题，符合现代审美
 
-```bash
-# 需要管理员权限运行，不然无法获取进程启动参数
-# 启动开发模式 (同时启动 React 开发服务器和 Electron)
-npm run electron-dev
+## 安装与运行
 
-# 或者分别启动
-npm start          # 启动 React 开发服务器
-npm run electron   # 启动 Electron
-```
+### 系统要求
 
-## 📱 打包
+- Python 3.7+
+- Windows 系统（推荐）
+- 英雄联盟客户端运行中
+
+### 安装依赖
 
 ```bash
-# 构建生产版本并打包
-npm run dist
-
-# 或者分步执行
-npm run build      # 构建 React 应用
-npm run electron-pack  # 打包 Electron 应用
+pip install -r requirements.txt
 ```
 
-## 📁 项目结构
+### 运行应用
+
+```bash
+python main.py
+```
+
+### 可选依赖
+
+对于更好的体验，建议安装以下可选依赖：
+
+```bash
+# Windows 特效支持
+pip install pywin32 pywinstyles
+
+# 键盘快捷键支持
+pip install keyboard
+```
+
+## 使用方法
+
+### 主界面操作
+
+1. **启动应用**: 运行 `main.py` 后，主界面会自动打开
+2. **查看信息**: 在"英雄选择"标签页查看当前对战信息
+3. **手动刷新**: 点击顶部"刷新"按钮手动更新数据
+4. **调整设置**: 在"设置"标签页调整更新间隔等参数
+
+### 悬浮窗操作
+
+1. **呼出悬浮窗**: 按 `Ctrl+Shift+O` 快捷键
+2. **移动位置**: 点击并拖拽窗口到任意位置
+3. **隐藏悬浮窗**: 再次按 `Ctrl+Shift+O` 或点击关闭按钮
+4. **复制信息**: 点击任意召唤师技能图标复制详细信息
+
+### 复制格式示例
+
+点击召唤师技能后，复制的信息格式如下：
 
 ```
-reddog/
-├── public/
-│   ├── electron.js      # Electron 主进程
-│   ├── index.html       # HTML 模板
-│   └── manifest.json    # Web 应用清单
+召唤师: 玩家名字
+英雄: 亚索
+技能: 闪现 (CD: 300s)
+冷却完成: 14:32:15
+符文: 征服者, 凯旋, 欢欣, 坚毅不倒
+```
+
+## 项目结构
+
+```
+LCU-Monitor/
+├── main.py                 # 主程序入口
+├── requirements.txt        # 依赖列表
+├── README.md              # 项目说明
 ├── src/
-│   ├── components/
-│   │   ├── LCUMonitor.js    # LCU监控组件
-│   │   └── LCUMonitor.css   # 监控组件样式
-│   ├── services/
-│   │   ├── lcuService.js    # 真实LCU服务
-│   │   └── lcuServiceDemo.js # 演示LCU服务
-│   ├── App.js           # 主 React 组件
-│   ├── App.css          # 组件样式
-│   ├── index.js         # React 入口
-│   ├── index.css        # 全局样式
-│   └── reportWebVitals.js # 性能监控
-├── package.json         # 项目配置
-├── README.md           # 项目说明
-└── LCU_README.md       # LCU功能详细说明
+│   ├── __init__.py        # 包初始化
+│   ├── lcu_client.py      # LCU API客户端
+│   ├── data_manager.py    # 数据管理器
+│   ├── main_window.py     # 主窗口界面
+│   ├── overlay_window.py  # 悬浮窗界面
+│   └── hotkey_manager.py  # 快捷键管理
 ```
 
-## 🎯 可用的脚本
+## 技术架构
 
-- `npm start` - 启动 React 开发服务器
-- `npm run build` - 构建生产版本
-- `npm test` - 运行测试
-- `npm run eject` - 弹出配置 (不可逆)
-- `npm run electron` - 启动 Electron
-- `npm run electron-dev` - 开发模式 (推荐)
-- `npm run electron-pack` - 打包应用
-- `npm run dist` - 构建并打包
+### 数据流
 
-## 🔧 技术栈
+```
+LCU Client → LCUClient → DataManager → UI Components
+                     ↓
+              Hotkey Manager → Overlay Window
+```
 
-- **前端框架**: React 18
-- **桌面框架**: Electron 25
-- **构建工具**: Create React App
-- **样式**: CSS3 (现代化设计)
-- **打包工具**: electron-builder
+### 组件职责
 
-## 🌟 特色功能
+- **LCUClient**: 与英雄联盟客户端通信
+- **DataManager**: 数据缓存、处理和分发
+- **MainWindow**: 主界面展示和交互
+- **OverlayWindow**: 悬浮窗展示
+- **HotkeyManager**: 全局快捷键监听
 
-1. **现代化 UI**: 使用渐变背景和毛玻璃效果
-2. **响应式设计**: 适配不同屏幕尺寸
-3. **平台检测**: 自动检测运行平台
-4. **交互式计数器**: 演示 React 状态管理
-5. **中文界面**: 完全中文化的用户界面
-6. **LCU监控**: 英雄联盟游戏状态监控 (演示模式)
-7. **标签页导航**: 多功能模块化设计
+## 开发说明
 
-## 📝 开发说明
+### 添加新功能
 
-### 开发模式
-开发模式下，应用会同时启动 React 开发服务器和 Electron，支持热重载。
+1. **扩展数据采集**: 在 `lcu_client.py` 中添加新的 API 端点
+2. **新增 UI 组件**: 在相应窗口类中添加新的展示逻辑
+3. **添加快捷键**: 在 `hotkey_manager.py` 中注册新的快捷键
 
-### 生产模式
-生产模式下，React 应用会被构建为静态文件，然后由 Electron 加载。
+### 样式定制
 
-### 打包配置
-应用支持打包为 Windows (.exe)、macOS (.dmg) 和 Linux (.AppImage) 格式。
+所有界面样式都集中管理，可以在各自文件中修改颜色配置：
 
-## 🤝 贡献
+```python
+# 在 main_window.py 或 overlay_window.py 中修改
+self.colors = {
+    'bg': '#1e1e2e',
+    'primary': '#89b4fa',
+    # ... 其他颜色
+}
+```
+
+## 故障排除
+
+### 常见问题
+
+1. **无法连接客户端**
+   - 确保英雄联盟客户端正在运行
+   - 检查是否有多个客户端实例
+
+2. **快捷键无效**
+   - 确保以管理员权限运行
+   - 检查是否有其他应用占用了快捷键
+
+3. **悬浮窗不显示**
+   - 检查是否被其他窗口遮挡
+   - 尝试重启应用
+
+### 调试模式
+
+运行应用时添加调试输出：
+
+```bash
+python main.py --debug
+```
+
+## 未来计划
+
+- [ ] 支持自定义快捷键
+- [ ] 添加更多召唤师技能信息
+- [ ] 实时对战数据分析
+- [ ] 导出对战记录
+- [ ] 多语言支持
+
+## 许可证
+
+MIT License - 详见 LICENSE 文件
+
+## 贡献
 
 欢迎提交 Issue 和 Pull Request！
 
-## �� 许可证
+## 联系方式
 
-MIT License 
+如有问题或建议，请通过 GitHub Issues 联系。

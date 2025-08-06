@@ -1,0 +1,16 @@
+# LCU Monitor Requirements
+
+# Core dependencies
+requests>=2.25.1
+psutil>=5.8.0
+pyperclip>=1.8.2
+
+# Cross-platform hotkey support
+keyboard>=0.13.5
+
+# For better UI (optional)
+pillow>=8.0.0
+
+# Development dependencies (optional)
+pytest>=6.0.0
+black>=21.0.0
