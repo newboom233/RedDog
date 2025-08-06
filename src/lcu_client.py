@@ -66,6 +66,7 @@ class LCUClient:
                         self.base_url = f"https://127.0.0.1:{port_match}"
                         auth_string = f"riot:{token_match}"
                         self.auth = base64.b64encode(auth_string.encode()).decode()
+                        print(self.auth)
                         self.connected = True
                         return True
             
@@ -87,19 +88,16 @@ class LCUClient:
             }
             
             url = f"{self.base_url}{endpoint}"
-            
-            # Skip SSL verification for mock mode
-            verify_ssl = not self.mock_mode
-            
+
             response = requests.request(
-                method, url, headers=headers, verify=verify_ssl, timeout=5, **kwargs
+                method, url, headers=headers, verify=False, timeout=5, **kwargs
             )
             
             if response.status_code == 200:
                 return response.json()
             else:
                 if not self.mock_mode:
-                    print(f"LCU API error: {response.status_code}")
+                    print(f"{endpoint} error: {response.status_code}")
                 return None
                 
         except requests.exceptions.RequestException as e:
@@ -111,6 +109,9 @@ class LCUClient:
         """Get current game session information"""
         return self._make_request('GET', '/lol-gameflow/v1/session')
     
+    def get_current_summoner(self) -> Optional[Dict[str, Any]]:
+        return self._make_request('GET', '/lol-summoner/v1/current-summoner')
+
     def get_champion_select_session(self) -> Optional[Dict[str, Any]]:
         """Get champion select session data"""
         return self._make_request('GET', '/lol-champ-select/v1/session')

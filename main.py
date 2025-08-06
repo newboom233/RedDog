@@ -35,7 +35,7 @@ class LCUMonitorApp:
         """Initialize all components"""
         try:
             # Initialize LCU client
-            self.lcu_client = LCUClient(mock_mode=True, mock_port=1947)
+            self.lcu_client = LCUClient(mock_mode=False, mock_port=1947)
             
             # Initialize data manager
             self.data_manager = DataManager(self.lcu_client)
