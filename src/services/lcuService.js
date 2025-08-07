@@ -1,10 +1,6 @@
 class LCUService {
   constructor() {
-    this.baseUrl = null;
-    this.port = null;
-    this.password = null;
     this.ws = null;
-    this.isConnected = false;
     this.gameData = null;
     this.enemyInfo = null;
     this.listeners = [];
@@ -12,8 +8,9 @@ class LCUService {
       isConnected: false,
       baseUrl: null,
       port: null,
-      hasPassword: false,
-      error: null
+      password: null,
+      error: null,
+      auth: null,
     };
     this.pollingInterval = null;
     this.reconnectAttempts = 0;
@@ -67,7 +64,7 @@ class LCUService {
               
               console.log('✅ 通过进程命令找到LCU:', { 
                 port, 
-                hasPassword: !!password
+                passowrd: password
               });
               
               return {
@@ -93,57 +90,6 @@ class LCUService {
     }
   }
 
-//   // 通过lockfile查找LCU（备用方法）
-//   async findLCUByLockfile() {
-//     try {
-//       if (!window.require) return null;
-      
-//       const fs = window.require('fs');
-//       const path = window.require('path');
-//       const os = window.require('os');
-      
-
-//       // 常见的lockfile位置
-//       const lockfilePaths = [
-//         path.join(os.homedir(), 'AppData', 'Roaming', 'League of Legends', 'lockfile'),
-//         path.join(os.homedir(), 'AppData', 'Local', 'Riot Games', 'League of Legends', 'lockfile'),
-//         path.join('C:', 'Riot Games', 'League of Legends', 'lockfile')
-//       ];
-
-//       for (const lockfilePath of lockfilePaths) {
-//         try {
-//           if (fs.existsSync(lockfilePath)) {
-//             const lockfileContent = fs.readFileSync(lockfilePath, 'utf8');
-//             const [processName, , port, password] = lockfileContent.split(':');
-            
-//             if (processName === 'LeagueClientUx' && port && password) {
-//               console.log('✅ 通过lockfile找到LCU:', { 
-//                 port, 
-//                 hasPassword: !!password,
-//                 lockfilePath
-//               });
-              
-//               return {
-//                 port,
-//                 password,
-//                 baseUrl: `https://127.0.0.1:${port}`
-//               };
-//             }
-//           }
-//         } catch (fileError) {
-//           console.log(`❌ 读取lockfile失败: ${lockfilePath}`, fileError.message);
-//           continue;
-//         }
-//       }
-      
-//       console.log('❌ 未找到有效的lockfile');
-//       return null;
-//     } catch (error) {
-//       console.error('❌ 通过lockfile查找LCU失败:', error);
-//       return null;
-//     }
-//   }
-
   // 改进的连接方法
   async connect() {
     try {
@@ -152,39 +98,17 @@ class LCUService {
       // 获取LCU连接信息（包括进程检测和lockfile查找）
       const connectionInfo = await this.getLCUProcessInfo();
       if (!connectionInfo) {
+        this.connectionStatus.error = '未找到英雄联盟客户端进程，请确保客户端已启动'
         throw new Error('未找到英雄联盟客户端进程，请确保客户端已启动');
       }
       
       console.log('✅ 找到LCU连接信息:', connectionInfo);
-      
-      // 设置连接信息
-      this.baseUrl = connectionInfo.baseUrl;
-      this.port = connectionInfo.port;
-      this.password = connectionInfo.password;
-      
-      console.log('🔐 连接信息:', {
-        baseUrl: this.baseUrl,
-        port: this.port,
-        hasPassword: !!this.password
-      });
-      
-      // 测试连接
-      const testResponse = await this.makeRequest('/lol-summoner/v1/current-summoner');
-      console.log('LCU API 状态码:', testResponse.status);
-      const responseText = await testResponse.text();
-      console.log('LCU API 返回内容:', responseText);
-      if (!testResponse.ok) {
-        throw new Error('LCU连接测试失败');
-      }
-      
-      this.isConnected = true;
-      this.connectionStatus = {
-        isConnected: true,
-        baseUrl: this.baseUrl,
-        port: this.port,
-        hasPassword: !!this.password,
-        error: null
-      };
+      connectionStatus = this.connectionStatus
+      connectionStatus.isConnected = true;
+      connectionStatus.baseUrl = connectionInfo.baseUrl;
+      connectionStatus.port = connectionInfo.port;
+      connectionStatus.password = connectionInfo.password;
+      connectionStatus.auth = Buffer.from(`riot:${this.password}`).toString('base64');
       
       console.log('✅ LCU连接成功！');
       
@@ -217,7 +141,6 @@ class LCUService {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'LeagueOfLegendsClient/12.1.1.1234567890 (CEF 91)',
       },
       timeout: 10000, // 10秒超时
     };
@@ -261,7 +184,7 @@ class LCUService {
         
         this.ws = new WebSocket(wsUrl, {
           headers: {
-            'Authorization': `Basic ${Buffer.from(`riot:${this.password}`).toString('base64')}`,
+            'Authorization': `Basic ${this.connectionStatus.auth}`,
           },
           agent,
         });
@@ -631,65 +554,20 @@ class LCUService {
                 } else {
                   console.log(`🎯 方法2 - 未在会话中找到玩家 ${playerName}`);
                 }
-              }
-            }
-            
-            // 方法3: 如果还是没有，尝试从召唤师信息获取
-            if (!spell1Id && !spell2Id && player.summonerId) {
-              console.log(`🎯 方法3 - 尝试从召唤师信息获取技能 (${playerName})...`);
-              const summonerResponse = await this.makeRequest(`/lol-summoner/v1/summoners/${player.summonerId}`);
-              if (summonerResponse.ok) {
-                const summonerData = await summonerResponse.json();
-                console.log(`🎯 召唤师数据 (${playerName}):`, summonerData);
-                
-                spell1Id = summonerData.spell1Id;
-                spell2Id = summonerData.spell2Id;
-                console.log(`🎯 方法3 - 从召唤师信息获取技能 (${playerName}):`, { spell1Id, spell2Id });
-              }
-            }
-            
-            // 方法4: 尝试从actions中获取技能信息
-            if (!spell1Id && !spell2Id) {
-              console.log(`🎯 方法4 - 尝试从actions获取技能信息 (${playerName})...`);
-              // 重新获取英雄选择会话数据来访问actions
-              const champSelectResponse = await this.makeRequest('/lol-champ-select/v1/session');
-              if (champSelectResponse.ok) {
-                const sessionData = await champSelectResponse.json();
-                if (sessionData.actions) {
-                  console.log('🎯 从actions获取技能信息...');
-                  for (const actionGroup of sessionData.actions) {
-                    for (const action of actionGroup) {
-                      if (action.summonerId === player.summonerId) {
-                        spell1Id = action.spell1Id;
-                        spell2Id = action.spell2Id;
-                        console.log(`🎯 方法4 - 从actions找到玩家 ${playerName} 的技能:`, { spell1Id, spell2Id });
-                        break;
-                      }
+                if ((!spell1Id && !spell2Id) && sessionData.actions) {
+                    console.log('🎯 从actions获取技能信息...');
+                    for (const actionGroup of sessionData.actions) {
+                        for (const action of actionGroup) {
+                            if (action.summonerId === player.summonerId) {
+                                spell1Id = action.spell1Id;
+                                spell2Id = action.spell2Id;
+                                console.log(`🎯 方法4 - 从actions找到玩家 ${playerName} 的技能:`, { spell1Id, spell2Id });
+                                break;
+                            }
+                        }
+                        if (spell1Id || spell2Id) break;
                     }
-                    if (spell1Id || spell2Id) break;
-                  }
                 }
-              }
-            }
-            
-            // 方法5: 尝试从当前召唤师信息获取默认技能
-            if (!spell1Id && !spell2Id) {
-              console.log(`🎯 方法5 - 尝试获取默认召唤师技能 (${playerName})...`);
-              try {
-                const currentSummonerResponse = await this.makeRequest('/lol-summoner/v1/current-summoner');
-                if (currentSummonerResponse.ok) {
-                  const currentSummoner = await currentSummonerResponse.json();
-                  console.log(`🎯 当前召唤师信息:`, currentSummoner);
-                  
-                  // 如果当前召唤师ID匹配，使用其技能
-                  if (currentSummoner.summonerId === player.summonerId) {
-                    spell1Id = currentSummoner.spell1Id;
-                    spell2Id = currentSummoner.spell2Id;
-                    console.log(`🎯 方法5 - 从当前召唤师获取技能 (${playerName}):`, { spell1Id, spell2Id });
-                  }
-                }
-              } catch (error) {
-                console.log(`🎯 方法5 - 获取当前召唤师信息失败:`, error.message);
               }
             }
             
